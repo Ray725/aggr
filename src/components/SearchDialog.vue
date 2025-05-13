@@ -363,6 +363,9 @@
         <button class="btn -text mrauto" @click="addAll">
           <i class="icon-plus mr8"></i> add all
         </button>
+        <button class="btn -text mr8" @click="downloadAllResults">
+          <i class="icon-download mr8"></i> download
+        </button>
         <button
           v-for="(i, index) in pagination"
           :key="index"
@@ -1158,6 +1161,54 @@ export default {
           return output
         }, {})
       )
+    },
+
+    downloadAllResults() {
+      // Get all results across all pages in the requested format
+      const allResults = {}
+
+      if (this.searchTypes.normalize) {
+        // Use the existing marketsByPair which has all results already grouped
+        Object.keys(this.marketsByPair).forEach(localPair => {
+          allResults[localPair] = this.marketsByPair[localPair]
+        })
+      } else {
+        // For non-normalized view, we need to group the results by pair
+        this.filteredProducts
+          .filter(product => this.queryFilter.test(product.id))
+          .forEach(product => {
+            let localPair
+            
+            if (product && this.searchTypes.mergeUsdt) {
+              localPair = product.base + stripStableQuote(product.quote)
+            } else {
+              localPair = product.base + product.quote
+            }
+
+            if (!allResults[localPair]) {
+              allResults[localPair] = []
+            }
+
+            allResults[localPair].push(product.id)
+          })
+      }
+
+      // Create and download the JSON file
+      const jsonStr = JSON.stringify(allResults, null, 2)
+      const blob = new Blob([jsonStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'trading_pairs.json'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      this.$store.dispatch('app/showNotice', {
+        id: 'download-results',
+        title: `Downloaded ${Object.keys(allResults).length} pair groups`
+      })
     },
 
     async refreshExchangeProducts(exchangeId) {
