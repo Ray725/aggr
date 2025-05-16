@@ -289,7 +289,7 @@ class WorkspacesService {
     if (Array.isArray(defaultWorkspaces)) {
       for (const workspace of defaultWorkspaces) {
         if (existing.indexOf(workspace.id) !== -1) {
-          continue
+          console.log(`[idb/defaultWorkspaces] workspace ${workspace.id} already exists, overwriting`)
         }
 
         console.log(`[idb/defaultWorkspaces] insert default workspace ${workspace.id} (${workspace.name})`)
