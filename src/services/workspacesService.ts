@@ -288,12 +288,6 @@ class WorkspacesService {
 
     if (Array.isArray(defaultWorkspaces)) {
       for (const workspace of defaultWorkspaces) {
-        if (existing.indexOf(workspace.id) !== -1) {
-          console.log(`[idb/defaultWorkspaces] workspace ${workspace.id} already exists, overwriting`)
-        }
-
-        console.log(`[idb/defaultWorkspaces] insert default workspace ${workspace.id} (${workspace.name})`)
-
         // Make sure workspace has required properties
         const completeWorkspace = {
           ...workspace,
@@ -303,7 +297,13 @@ class WorkspacesService {
         }
 
         try {
-          await tx.store.add(completeWorkspace)
+          if (existing.indexOf(workspace.id) !== -1) {
+            console.log(`[idb/defaultWorkspaces] workspace ${workspace.id} already exists, overwriting`)
+            await tx.store.put(completeWorkspace)
+          } else {
+            console.log(`[idb/defaultWorkspaces] insert default workspace ${workspace.id} (${workspace.name})`)
+            await tx.store.add(completeWorkspace)
+          }
         } catch (error) {
           console.error(error)
           throw error
