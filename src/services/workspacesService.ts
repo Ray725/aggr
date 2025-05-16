@@ -1,6 +1,7 @@
 import defaultIndicators from '@/store/defaultIndicators.json'
 import defaultPresets from '@/store/defaultPresets.json'
 import defaultPanes from '@/store/defaultPanes.json'
+import defaultWorkspaces from '@/store/defaultWorkspaces.json'
 import store, { boot } from '@/store'
 import { IndicatorSettings } from '@/store/panesSettings/chart'
 import {
@@ -205,7 +206,7 @@ class WorkspacesService {
 
     await this.insertDefaultIndicators(db)
     await this.insertDefaultPresets(db)
-
+    
     localStorage.setItem('version', import.meta.env.VITE_APP_VERSION)
   }
 
@@ -276,6 +277,61 @@ class WorkspacesService {
     }
 
     await tx.done
+  }
+
+  async insertDefaultWorkspaces() {
+    const now = Date.now()
+    const tx = this.db.transaction('workspaces', 'readwrite')
+
+    const existing = await tx.store.getAllKeys()
+    let added = 0
+
+    if (Array.isArray(defaultWorkspaces)) {
+      for (const workspace of defaultWorkspaces) {
+        if (existing.indexOf(workspace.id) !== -1) {
+          continue
+        }
+
+        console.log(`[idb/defaultWorkspaces] insert default workspace ${workspace.id} (${workspace.name})`)
+
+        // Make sure workspace has required properties
+        const completeWorkspace = {
+          ...workspace,
+          version: this.latestWorkspaceVersion,
+          createdAt: now,
+          updatedAt: null
+        }
+
+        try {
+          await tx.store.add(completeWorkspace)
+        } catch (error) {
+          console.error(error)
+          throw error
+        }
+
+        added++
+      }
+    }
+
+    if (added) {
+      console.debug(`[idb/defaultWorkspaces] ${added} workspaces added`)
+      // Refresh workspaces list
+      await this.getWorkspaces()
+      
+      // Show notification
+      store.dispatch('app/showNotice', {
+        type: 'success',
+        title: `${added} template${added > 1 ? 's' : ''} loaded successfully`
+      })
+    } else {
+      store.dispatch('app/showNotice', {
+        type: 'info',
+        title: 'No new templates to load'
+      })
+    }
+
+    await tx.done
+    return added
   }
 
   /**

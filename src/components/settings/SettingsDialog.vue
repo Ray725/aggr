@@ -101,6 +101,10 @@
             <i class="icon-plus"></i>
             <span>Create blank template</span>
           </Btn>
+          <button type="button" class="dropdown-item" @click="loadDefaultTemplates">
+            <i class="icon-download"></i>
+            <span>Load additional templates</span>
+          </button>
         </dropdown>
       </div>
       <table v-if="workspaces.length" class="table mt8 table--inset">
@@ -628,6 +632,11 @@ export default {
           timeout: 60000
         })
       }
+    },
+
+    async loadDefaultTemplates() {
+      await workspacesService.insertDefaultWorkspaces()
+      await this.getWorkspaces()
     },
 
     async renameWorkspace(id = this.workspaceDropdownId) {
