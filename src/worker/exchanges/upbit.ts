@@ -72,7 +72,7 @@ export default class UPBIT extends Exchange {
       timestamp: trade.trade_timestamp,
       price: tradePrice.times(this.KRW_USD).toNumber(),
       size: tradeSize.times(this.KRW_USD).toNumber(),
-      side: trade.ask_bid
+      side: trade.ask_bid === 'ASK' ? 'sell' : 'buy'
     }
   }
 
