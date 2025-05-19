@@ -74,7 +74,9 @@ export default class UPBIT extends Exchange {
   onMessage(event, api) {
     let tradeData;
     try {
-      tradeData = JSON.parse(event.data);
+      // Decode ArrayBuffer to string
+      const messageString = event.data instanceof ArrayBuffer ? new TextDecoder().decode(event.data) : event.data;
+      tradeData = JSON.parse(messageString);
     } catch (e) {
       console.warn(`[${this.id}] Failed to parse JSON message:`, event.data, e);
       return;
