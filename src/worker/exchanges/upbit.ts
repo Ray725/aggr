@@ -1,8 +1,10 @@
 import Exchange from '../exchange'
+import Big from 'big.js'
 
 export default class UPBIT extends Exchange {
   id = 'UPBIT'
   private locallySubscribedPairs = new Set<string>();
+  private KRW_USD = new Big(0.00072);
 
   protected endpoints = {
     PRODUCTS: 'https://api.upbit.com/v1/market/all'
@@ -61,12 +63,15 @@ export default class UPBIT extends Exchange {
   }
 
   formatTrade(trade) {
+    const tradePrice = new Big(trade.trade_price);
+    const tradeSize = new Big(trade.trade_volume);
+
     return {
       exchange: this.id,
       pair: trade.code,
       timestamp: trade.trade_timestamp,
-      price: +trade.trade_price,
-      size: +trade.trade_volume,
+      price: tradePrice.times(this.KRW_USD).toNumber(),
+      size: tradeSize.times(this.KRW_USD).toNumber(),
       side: trade.ask_bid
     }
   }
