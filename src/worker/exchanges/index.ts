@@ -26,6 +26,7 @@ import Gateio from './gateio'
 import CryptoCom from './cryptocom'
 import Bitmart from './bitmart'
 import Upbit from './upbit'
+import Hyperliquid from './hyperliquid'
 
 export const exchanges = [
   new Aggr(),
@@ -53,7 +54,8 @@ export const exchanges = [
   new Gateio(),
   new CryptoCom(),
   new Bitmart(),
-  new Upbit()
+  new Upbit(),
+  new Hyperliquid()
 ] as Exchange[]
 
 export function getExchangeById(id: string) {
