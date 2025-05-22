@@ -33,7 +33,7 @@ export default class UPBIT extends Exchange {
     api.send(
         JSON.stringify([
             { ticket: 'aggr' },
-            { type: 'trade', codes: Array.from(this.locallySubscribedPairs) },
+            { type: 'trade', codes: [pair] },
             { format: 'DEFAULT' }
         ])
     );

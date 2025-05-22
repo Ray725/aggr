@@ -44,7 +44,7 @@
   "devDependencies": {
     "@types/lodash.merge": "^4.6.8",
     "@types/marked": "^6.0.0",
-    "@types/node": "20.2.0",
+    "@types/node": "^20.2.0",
     "@types/pako": "^2.0.0",
     "@types/sharedworker": "0.0.29",
     "@vitejs/plugin-vue2": "^2.2.0",
