@@ -59,18 +59,21 @@ export default class BITHUMB extends Exchange {
   }
 
   formatTrade(trade, pairCoin) {
+    let tradePrice = new Big(trade.trade_price);
+
     return {
       exchange: this.id,
       pair: pairCoin,
       timestamp: trade.trade_timestamp,
-      price: trade.trade_price.times(this.KRW_USD).toNumber(),
+      price: tradePrice.times(this.KRW_USD).toNumber(),
       size: +trade.trade_volume,
       side: trade.ask_bid === 'BID' ? 'buy' : 'sell'
     };
   }
 
   onMessage(event, api) {
-    const json = JSON.parse(event.data)
+    const messageString = event.data instanceof ArrayBuffer ? new TextDecoder().decode(event.data) : event.data;
+    const json = JSON.parse(messageString);
 
     if (json.type === "trade" && json.code) {
       if (this.locallySubscribedPairs.has(json.code)) {
