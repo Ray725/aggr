@@ -7,7 +7,7 @@ export default class BITMEX extends Exchange {
   private multipliers: { [pair: string]: number }
   private underlyingToPositionMultipliers: { [pair: string]: number }
   protected endpoints = {
-    PRODUCTS: 'https://www.bitmex.com/api/v1/instrument/active'
+    PRODUCTS: 'https://vfa-microservice.fly.dev/get-bitmex-pairs'
   }
 
   async getUrl() {

@@ -6,7 +6,7 @@ export default class BITHUMB extends Exchange {
   private locallySubscribedPairs = new Set<string>();
   private KRW_USD = new Big(0.00072);
   protected endpoints = {
-    PRODUCTS: 'https://api.bithumb.com/v1/market/all'
+    PRODUCTS: 'https://vfa-microservice.fly.dev/get-bithumb-pairs'
   }
   protected maxConnectionsPerApi = 100
   protected delayBetweenMessages = 250
@@ -16,6 +16,7 @@ export default class BITHUMB extends Exchange {
   }
 
   formatProducts(data) {
+    console.log(data)
     return data.map(product => product.market)
   }
 

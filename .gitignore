@@ -1,5 +1,5 @@
 .DS_Store
-node_modules
+node_modules/*
 src-tauri
 stats.html
 dev-dist
@@ -17,3 +17,5 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+src/services/productsService.ts
+src/utils/helpers.ts
