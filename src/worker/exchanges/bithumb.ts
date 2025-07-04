@@ -4,7 +4,7 @@ import Big from 'big.js'
 export default class BITHUMB extends Exchange {
   id = 'BITHUMB'
   private locallySubscribedPairs = new Set<string>();
-  private KRW_USD = new Big(0.00072);
+  private KRW_USD = new Big(0.00073);
   protected endpoints = {
     PRODUCTS: 'https://vfa-microservice.fly.dev/get-bithumb-pairs'
   }

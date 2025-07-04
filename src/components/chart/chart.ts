@@ -298,8 +298,6 @@ export default class Chart {
    * create Lightweight Charts instance and render pane's indicators
    */
   createChart() {
-    console.log(`[chart/${this.paneId}/controller] create chart`)
-
     const chartOptions = merge(
       getChartOptions(defaultChartOptions, this.paneId),
       getChartWatermarkOptions(this.paneId),
@@ -326,8 +324,6 @@ export default class Chart {
    * remove series, destroy this.chartInstance and cancel related events
    */
   removeChart() {
-    console.log(`[chart/${this.paneId}/controller] remove chart`)
-
     this.chartControl.unbindEvents()
 
     this.priceScales.splice(0, this.priceScales.length)
@@ -941,8 +937,6 @@ export default class Chart {
    * only use when chart indicators are cleared
    */
   clearData() {
-    console.log(`[chart/${this.paneId}/controller] clear data`)
-
     this.activeRenderer = null
     this.activeChunk = null
     this.queuedTrades.splice(0, this.queuedTrades.length)
@@ -975,8 +969,6 @@ export default class Chart {
    * fresh start : clear cache, renderer and rendered series on chart
    */
   clear() {
-    console.log(`[chart/${this.paneId}/controller] clear`)
-
     this.chartCache.clear()
     this.clearData()
     this.clearChart()
@@ -1012,8 +1004,6 @@ export default class Chart {
    * clear everything
    */
   destroy() {
-    console.log(`[chart/${this.paneId}/controller] destroy`)
-
     this.chartCache.clear()
     this.clearData()
     this.clearChart()
@@ -2476,6 +2466,14 @@ export default class Chart {
       )
     }
 
+    // Split markets into UPBIT/BITHUMB and others
+    const upbitBithumbMarkets = this.historicalMarkets.filter(market => 
+      market.startsWith('UPBIT:') || market.startsWith('BITHUMB:')
+    )
+    const otherMarkets = this.historicalMarkets.filter(market => 
+      !market.startsWith('UPBIT:') && !market.startsWith('BITHUMB:')
+    )
+
     const barsCount = Math.floor(
       (rangeToFetch.to - rangeToFetch.from) / timeframe
     )
@@ -2495,17 +2493,57 @@ export default class Chart {
 
     this.isLoading = true
 
-    return historicalService
-      .fetch(
-        rangeToFetch.from * 1000,
-        rangeToFetch.to * 1000,
-        timeframe,
-        this.historicalMarkets
+    // Create promises for both APIs
+    const promises = []
+
+    // Original API call for non-UPBIT/BITHUMB markets
+    if (otherMarkets.length > 0) {
+      promises.push(
+        historicalService.fetch(
+          rangeToFetch.from * 1000,
+          rangeToFetch.to * 1000,
+          timeframe,
+          otherMarkets
+        )
       )
-      .then(results => this.onHistorical(results))
+    }
+
+    // New API call for UPBIT/BITHUMB markets
+    if (upbitBithumbMarkets.length > 0) {
+      promises.push(
+        this.fetchUpbitBithumbData(rangeToFetch, timeframe, upbitBithumbMarkets)
+      )
+    }
+
+    // If no markets to fetch, return early
+    if (promises.length === 0) {
+      this.isLoading = false
+      store.dispatch('app/hideNotice', 'fetching-' + this.paneId)
+      return Promise.resolve()
+    }
+
+    return Promise.all(promises)
+      .then(results => {
+        console.log(`[chart/${this.paneId}/fetch] Received ${results.length} results from APIs:`, results.map(r => ({
+          from: r.from,
+          to: r.to,
+          dataCount: r.data.length,
+          initialPricesCount: Object.keys(r.initialPrices).length
+        })))
+        
+        // Combine results from both APIs
+        const combinedResult = this.combineHistoricalResults(results)
+        console.log(`[chart/${this.paneId}/fetch] Combined result:`, {
+          from: combinedResult.from,
+          to: combinedResult.to,
+          dataCount: combinedResult.data.length,
+          initialPricesCount: Object.keys(combinedResult.initialPrices).length
+        })
+        
+        return this.onHistorical(combinedResult)
+      })
       .catch(err => {
         console.error(err)
-
         this.hasReachedEnd = true
       })
       .then(() => {
@@ -2519,6 +2557,109 @@ export default class Chart {
           )
         }, 200)
       })
+  }
+
+  /**
+   * Fetch historical data for UPBIT/BITHUMB markets from the new API
+   * @param {TimeRange} rangeToFetch 
+   * @param {number} timeframe 
+   * @param {string[]} markets 
+   * @returns {Promise<HistoricalResponse>}
+   */
+  private async fetchUpbitBithumbData(
+    rangeToFetch: TimeRange, 
+    timeframe: number, 
+    markets: string[]
+  ): Promise<HistoricalResponse> {
+    console.log(`[chart/${this.paneId}/fetchUpbitBithumbData] Fetching data:`, {
+      rangeFrom: rangeToFetch.from,
+      rangeTo: rangeToFetch.to,
+      timeframe,
+      markets
+    })
+    
+    const response = await fetch('', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timeframe: timeframe,
+        rangeToFetchFrom: rangeToFetch.from * 1000,
+        rangeToFetchTo: rangeToFetch.to * 1000,
+        historicalMarkets: markets
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    console.log(`[chart/${this.paneId}/fetchUpbitBithumbData] Received data:`, {
+      from: data.from,
+      to: data.to,
+      dataCount: data.data ? data.data.length : 0,
+      sampleData: data.data ? data.data.slice(0, 3) : []
+    })
+    
+    // Transform to match HistoricalResponse format
+    return {
+      from: data.from,
+      to: data.to,
+      data: data.data || [],
+      initialPrices: data.data.reduce((acc, bar) => {
+        if (!acc[bar.market]) {
+          acc[bar.market] = bar.close
+        }
+        return acc
+      }, {})
+    }
+  }
+
+  /**
+   * Combine results from multiple historical API calls
+   * @param {HistoricalResponse[]} results 
+   * @returns {HistoricalResponse}
+   */
+  private combineHistoricalResults(results: HistoricalResponse[]): HistoricalResponse {
+    if (results.length === 0) {
+      return { from: 0, to: 0, data: [], initialPrices: {} }
+    }
+
+    if (results.length === 1) {
+      return results[0]
+    }
+
+    // Use the first result's time range as the base
+    // This ensures compatibility with the cache logic
+    const baseResult = results[0]
+    
+    // Combine all data and sort by time
+    const allData = results.reduce((acc, result) => {
+      return acc.concat(result.data)
+    }, [])
+
+    // Sort by time timestamp
+    allData.sort((a, b) => a.time - b.time)
+
+    // Combine initial prices
+    const combinedInitialPrices = results.reduce((acc, result) => {
+      return { ...acc, ...result.initialPrices }
+    }, {})
+
+    // Use the base result's time range to maintain cache compatibility
+    // but ensure we cover all the data we actually have
+    const actualFrom = allData.length > 0 ? Math.min(...allData.map(bar => bar.time)) : baseResult.from
+    const actualTo = allData.length > 0 ? Math.max(...allData.map(bar => bar.time)) : baseResult.to
+
+    return {
+      from: Math.min(baseResult.from, actualFrom),
+      to: Math.max(baseResult.to, actualTo),
+      data: allData,
+      initialPrices: combinedInitialPrices
+    }
   }
 
   /**
