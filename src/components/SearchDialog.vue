@@ -113,6 +113,15 @@
           </label>
         </template>
         <template v-slot:control>
+          <button
+            v-if="canRefreshProducts"
+            class="btn -text -small mr8"
+            @click="refreshExchangeProducts()"
+            title="Refresh all exchange products"
+            v-tippy="{ boundary: 'window', placement: 'left' }"
+          >
+            <i class="icon-refresh"></i>
+          </button>
           <label class="checkbox-control -small flex-right">
             <input
               type="checkbox"
