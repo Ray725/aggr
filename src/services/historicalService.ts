@@ -31,10 +31,11 @@ class HistoricalService extends EventEmitter {
 
   filterOutUnavailableMarkets(markets: string[]) {
     return markets.filter(
-      market => 
+      market =>
         store.state.app.historicalMarkets.indexOf(market) !== -1 ||
         market.startsWith('UPBIT:') ||
-        market.startsWith('BITHUMB:')
+        market.startsWith('BITHUMB:') ||
+        market.startsWith('HYPERLIQUID-SPOT:')
     )
   }
 

@@ -2466,12 +2466,17 @@ export default class Chart {
       )
     }
 
-    // Split markets into UPBIT/BITHUMB and others
-    const upbitBithumbMarkets = this.historicalMarkets.filter(market => 
+    // Split markets into UPBIT/BITHUMB, HYPERLIQUID-SPOT, and others
+    const upbitBithumbMarkets = this.historicalMarkets.filter(market =>
       market.startsWith('UPBIT:') || market.startsWith('BITHUMB:')
     )
-    const otherMarkets = this.historicalMarkets.filter(market => 
-      !market.startsWith('UPBIT:') && !market.startsWith('BITHUMB:')
+    const hyperliquidMarkets = this.historicalMarkets.filter(market =>
+      market.startsWith('HYPERLIQUID-SPOT:')
+    )
+    const otherMarkets = this.historicalMarkets.filter(market =>
+      !market.startsWith('UPBIT:') &&
+      !market.startsWith('BITHUMB:') &&
+      !market.startsWith('HYPERLIQUID-SPOT:')
     )
 
     const barsCount = Math.floor(
@@ -2493,10 +2498,10 @@ export default class Chart {
 
     this.isLoading = true
 
-    // Create promises for both APIs
+    // Create promises for all three APIs
     const promises = []
 
-    // Original API call for non-UPBIT/BITHUMB markets
+    // Original API call for standard markets
     if (otherMarkets.length > 0) {
       promises.push(
         historicalService.fetch(
@@ -2508,10 +2513,17 @@ export default class Chart {
       )
     }
 
-    // New API call for UPBIT/BITHUMB markets
+    // UPBIT/BITHUMB API call
     if (upbitBithumbMarkets.length > 0) {
       promises.push(
         this.fetchUpbitBithumbData(rangeToFetch, timeframe, upbitBithumbMarkets)
+      )
+    }
+
+    // Clickhouse API call for HYPERLIQUID-SPOT markets
+    if (hyperliquidMarkets.length > 0) {
+      promises.push(
+        this.fetchClickhouseData(rangeToFetch, timeframe, hyperliquidMarkets)
       )
     }
 
@@ -2561,14 +2573,14 @@ export default class Chart {
 
   /**
    * Fetch historical data for UPBIT/BITHUMB markets from the new API
-   * @param {TimeRange} rangeToFetch 
-   * @param {number} timeframe 
-   * @param {string[]} markets 
+   * @param {TimeRange} rangeToFetch
+   * @param {number} timeframe
+   * @param {string[]} markets
    * @returns {Promise<HistoricalResponse>}
    */
   private async fetchUpbitBithumbData(
-    rangeToFetch: TimeRange, 
-    timeframe: number, 
+    rangeToFetch: TimeRange,
+    timeframe: number,
     markets: string[]
   ): Promise<HistoricalResponse> {
     console.log(`[chart/${this.paneId}/fetchUpbitBithumbData] Fetching data:`, {
@@ -2577,7 +2589,7 @@ export default class Chart {
       timeframe,
       markets
     })
-    
+
     const response = await fetch('', {
       method: 'POST',
       headers: {
@@ -2603,7 +2615,7 @@ export default class Chart {
       dataCount: data.data ? data.data.length : 0,
       sampleData: data.data ? data.data.slice(0, 3) : []
     })
-    
+
     // Transform to match HistoricalResponse format
     return {
       from: data.from,
@@ -2615,6 +2627,59 @@ export default class Chart {
         }
         return acc
       }, {})
+    }
+  }
+
+  /**
+   * Fetch historical data for HYPERLIQUID-SPOT markets from Clickhouse API
+   * @param {TimeRange} rangeToFetch
+   * @param {number} timeframe
+   * @param {string[]} markets
+   * @returns {Promise<HistoricalResponse>}
+   */
+  private async fetchClickhouseData(
+    rangeToFetch: TimeRange,
+    timeframe: number,
+    markets: string[]
+  ): Promise<HistoricalResponse> {
+    console.log(`[chart/${this.paneId}/fetchClickhouseData] Fetching data:`, {
+      rangeFrom: rangeToFetch.from,
+      rangeTo: rangeToFetch.to,
+      timeframe,
+      markets
+    })
+
+    const response = await fetch('', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timeframe: timeframe,
+        rangeFrom: rangeToFetch.from * 1000,
+        rangeTo: rangeToFetch.to * 1000,
+        markets: markets
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    console.log(`[chart/${this.paneId}/fetchClickhouseData] Received data:`, {
+      from: data.from,
+      to: data.to,
+      dataCount: data.data ? data.data.length : 0,
+      sampleData: data.data ? data.data.slice(0, 3) : []
+    })
+
+    return {
+      from: data.from,
+      to: data.to,
+      data: data.data,
+      initialPrices: data.initialPrices || {}
     }
   }
 
