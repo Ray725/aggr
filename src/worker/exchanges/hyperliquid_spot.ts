@@ -1,13 +1,12 @@
 import Exchange from '../exchange'
 
-export default class HYPERLIQUID extends Exchange {
-  id = 'HYPERLIQUID'
+export default class HYPERLIQUID_SPOT extends Exchange {
+  id = 'HYPERLIQUID_SPOT'
   private subscriptions = {}
   private spotTokenMap: { [symbol: string]: string } = {} // Maps @1 -> PURR/USDC
   private spotTokens: any[] = []
   protected endpoints = {
-    PRODUCTS: 'https://vfa-microservice.fly.dev/get-hl-pairs',
-    SPOT_META: {
+    PRODUCTS: {
       url: 'https://api.hyperliquid.xyz/info',
       method: 'POST',
       data: JSON.stringify({ type: 'spotMeta' })
@@ -72,9 +71,37 @@ export default class HYPERLIQUID extends Exchange {
   }
 
   formatProducts(data) {
-    // Initialize spot tokens when products are set
-    this.initializeSpotTokens();
-    return data;
+    // Return array of USDC-denominated spot pairs
+    if (!data || !data.tokens || !data.universe) {
+      return [];
+    }
+
+    this.spotTokens = data.tokens;
+
+    const usdcToken = data.tokens.find(t => t.name === 'USDC');
+    const usdcIndex = usdcToken ? usdcToken.index : 0;
+
+    const products = [];
+
+    // Build token map and products list at the same time
+    for (const universeEntry of data.universe) {
+      // Only include USDC-denominated pairs
+      if (universeEntry.tokens && universeEntry.tokens[1] === usdcIndex) {
+        const baseTokenIndex = universeEntry.tokens[0];
+        const baseToken = data.tokens.find(t => t.index === baseTokenIndex);
+
+        if (baseToken && baseToken.name !== 'USDC') {
+          const pairName = `${baseToken.name}/USDC`;
+          products.push(pairName);
+
+          // Also build the token map for subscriptions
+          const symbol = `@${baseTokenIndex}`;
+          this.spotTokenMap[symbol] = pairName;
+        }
+      }
+    }
+
+    return products;
   }
 
   /**
@@ -87,29 +114,18 @@ export default class HYPERLIQUID extends Exchange {
       return
     }
 
-    let coin: string;
-    let subscription;
+    // Find the corresponding @ symbol for this spot pair
+    const spotSymbol = Object.keys(this.spotTokenMap).find(
+      key => this.spotTokenMap[key] === pair
+    );
 
-    // Detect if this is a spot pair (contains /) or perp pair (contains -)
-    if (pair.includes('/')) {
-      // Spot pair like PURR/USDC
-      // Find the corresponding @ symbol
-      const spotSymbol = Object.keys(this.spotTokenMap).find(
-        key => this.spotTokenMap[key] === pair
-      );
-
-      if (!spotSymbol) {
-        console.warn(`[${this.id}] No spot symbol found for pair ${pair}`);
-        return false;
-      }
-
-      coin = spotSymbol; // e.g., "@1"
-    } else {
-      // Perp pair like BTC-USD
-      coin = pair.split('-')[0];
+    if (!spotSymbol) {
+      console.warn(`[${this.id}] No spot symbol found for pair ${pair}`);
+      return false;
     }
 
-    subscription = { type: "trades", coin };
+    const coin = spotSymbol; // e.g., "@1"
+    const subscription = { type: "trades", coin };
     const message = {
       method: "subscribe",
       subscription
@@ -122,7 +138,7 @@ export default class HYPERLIQUID extends Exchange {
   }
 
   /**
-   * Sub
+   * Unsub
    * @param {WebSocket} api
    * @param {string} pair
    */
@@ -148,19 +164,11 @@ export default class HYPERLIQUID extends Exchange {
   }
 
   formatTrade(trade, pairCoin) {
-    let pair: string;
-
-    // Check if this is a spot trade (pairCoin starts with @)
-    if (pairCoin.startsWith('@')) {
-      // Spot trade - look up the pair name
-      pair = this.spotTokenMap[pairCoin];
-      if (!pair) {
-        console.warn(`[${this.id}] Unknown spot symbol ${pairCoin}`);
-        pair = pairCoin; // Fallback to the raw symbol
-      }
-    } else {
-      // Perp trade
-      pair = `${pairCoin}-USD`;
+    // Look up the pair name from the @ symbol
+    const pair = this.spotTokenMap[pairCoin];
+    if (!pair) {
+      console.warn(`[${this.id}] Unknown spot symbol ${pairCoin}`);
+      return null;
     }
 
     return {
@@ -181,7 +189,13 @@ export default class HYPERLIQUID extends Exchange {
       const tradesToEmit = [];
       for (const tradeData of json.data) {
         // The 'coin' field from the trade data is used to form the pair
-        tradesToEmit.push(this.formatTrade(tradeData, tradeData.coin));
+        // Only process trades that start with @ (spot trades)
+        if (tradeData.coin && tradeData.coin.startsWith('@')) {
+          const formattedTrade = this.formatTrade(tradeData, tradeData.coin);
+          if (formattedTrade) {
+            tradesToEmit.push(formattedTrade);
+          }
+        }
       }
       if (tradesToEmit.length > 0) {
         return this.emitTrades(api.id, tradesToEmit);

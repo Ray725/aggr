@@ -27,6 +27,7 @@ import CryptoCom from './cryptocom'
 import Bitmart from './bitmart'
 import Upbit from './upbit'
 import Hyperliquid from './hyperliquid'
+import HyperliquidSpot from './hyperliquid_spot'
 import Bithumb from './bithumb'
 
 export const exchanges = [
@@ -57,6 +58,7 @@ export const exchanges = [
   new Bitmart(),
   new Upbit(),
   new Hyperliquid(),
+  new HyperliquidSpot(),
   new Bithumb()
 ] as Exchange[]
 
